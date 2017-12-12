@@ -10,7 +10,9 @@
 #import <CoreBluetooth/CoreBluetooth.h>
 
 #define SERVICE_UUID @"CDD1"
-#define CHARACTERISTIC_UUID @"CDD2"
+#define CHARACTERISTIC_UUID2 @"CDD2"
+#define CHARACTERISTIC_UUID3 @"CDD3"
+#define CHARACTERISTIC_UUID4 @"CDD4"
 
 @interface ViewController ()<CBPeripheralManagerDelegate,UITextFieldDelegate>
 @property (nonatomic, strong) CBPeripheralManager *peripheralManager;
@@ -70,26 +72,32 @@
     // 创建服务
     CBUUID *serviceID = [CBUUID UUIDWithString:SERVICE_UUID];
     CBMutableService *service = [[CBMutableService alloc] initWithType:serviceID primary:YES];
-    // 创建服务中的特征
-    CBUUID *characteristicID = [CBUUID UUIDWithString:CHARACTERISTIC_UUID];
-    CBMutableCharacteristic *characteristic = [
-                                               [CBMutableCharacteristic alloc]
-                                               initWithType:characteristicID
-                                               properties:
-                                               CBCharacteristicPropertyRead |
-                                               CBCharacteristicPropertyWrite |
-                                               CBCharacteristicPropertyNotify
-                                               value:nil
-                                               permissions:CBAttributePermissionsReadable |
-                                               CBAttributePermissionsWriteable
-                                               ];
+    /*
+     可以通知的Characteristic
+     properties：CBCharacteristicPropertyNotify
+     permissions CBAttributePermissionsReadable
+     */
+    CBMutableCharacteristic *notiyCharacteristic = [[CBMutableCharacteristic alloc]initWithType:[CBUUID UUIDWithString:CHARACTERISTIC_UUID2] properties:CBCharacteristicPropertyWrite | CBCharacteristicPropertyRead | CBCharacteristicPropertyNotify value:nil permissions:CBAttributePermissionsReadable | CBAttributePermissionsWriteable];
+    
+    /*
+     可读写的characteristics
+     properties：CBCharacteristicPropertyWrite | CBCharacteristicPropertyRead
+     permissions CBAttributePermissionsReadable | CBAttributePermissionsWriteable
+     */
+    CBMutableCharacteristic *readwriteCharacteristic = [[CBMutableCharacteristic alloc]initWithType:[CBUUID UUIDWithString:CHARACTERISTIC_UUID3] properties:CBCharacteristicPropertyWrite | CBCharacteristicPropertyRead | CBCharacteristicPropertyNotify value:nil permissions:CBAttributePermissionsReadable | CBAttributePermissionsWriteable];
+    //设置description
+    CBMutableDescriptor *readwriteCharacteristicDescription1 = [[CBMutableDescriptor alloc]initWithType:[CBUUID UUIDWithString:CBUUIDCharacteristicUserDescriptionString] value:@"name"];
+    [readwriteCharacteristic setDescriptors:@[readwriteCharacteristicDescription1]];
+    
+    CBMutableCharacteristic *readwriteCharacteristic2 = [[CBMutableCharacteristic alloc]initWithType:[CBUUID UUIDWithString:CHARACTERISTIC_UUID4] properties:CBCharacteristicPropertyWrite | CBCharacteristicPropertyRead | CBCharacteristicPropertyNotify value:nil permissions:CBAttributePermissionsReadable | CBAttributePermissionsWriteable];
+    
     // 特征添加进服务
-    service.characteristics = @[characteristic];
+    [service setCharacteristics:@[notiyCharacteristic,readwriteCharacteristic,readwriteCharacteristic2]];
     // 服务加入管理
     [self.peripheralManager addService:service];
     
     // 为了手动给中心设备发送数据
-    self.characteristic = characteristic;
+    self.characteristic = notiyCharacteristic;
 }
 
 /** 中心设备读取数据的时候回调 */
@@ -106,15 +114,15 @@
 - (void)peripheralManager:(CBPeripheralManager *)peripheral didReceiveWriteRequests:(NSArray<CBATTRequest *> *)requests {
     // 写入数据的请求
     CBATTRequest *request = requests.lastObject;
+    NSDictionary * dic = [NSJSONSerialization JSONObjectWithData:request.value options:NSJSONReadingMutableContainers error:nil];
     // 把写入的数据显示在文本框中
-    NSString * receiveText = [[NSString alloc] initWithData:request.value encoding:NSUTF8StringEncoding];
-    NSString * text = [[NSString alloc] initWithFormat:@"\n%@",receiveText];
+    NSString * text = [[NSString alloc] initWithFormat:@"\n%@",dic[@"value"]];
     
     NSString * showText = [self.textView.text stringByAppendingString:text];
     self.textView.text = showText;
     
     NSLog(@"中心设备写入数据");
-    NSString * value = [[NSString alloc] initWithFormat:@"%@已接收到",text];
+    NSString * value = [[NSString alloc] initWithFormat:@"%@数据已接收到",dic[@"id"]];
     BOOL sendSuccess = [self.peripheralManager updateValue:[value dataUsingEncoding:NSUTF8StringEncoding] forCharacteristic:self.characteristic onSubscribedCentrals:nil];
     if (sendSuccess) {
         NSLog(@"回调发送成功");
